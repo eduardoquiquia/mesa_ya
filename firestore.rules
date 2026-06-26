@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    match /users/{userId} {
+      allow create: if isOwner(userId)
+        && (
+          request.resource.data.role == "cliente"
+          || (
+            request.resource.data.role == "admin"
+            && request.auth.token.email == "admin@mesaya.com"
+          )
+        );
+      allow read: if isOwner(userId) || isAdmin();
+      allow update: if isAdmin()
+        || (
+          isOwner(userId)
+          && request.resource.data.role == resource.data.role
+        );
+      allow delete: if isAdmin();
+
+      match /reservas/{reservaId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+
+        match /pedido/{pedidoId} {
+          allow read, write: if isOwner(userId) || isAdmin();
+        }
+      }
+    }
+
+    match /reservas_admin/{reservaId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+
+      match /pedido/{pedidoId} {
+        allow read, update, delete: if isAdmin();
+        allow create: if signedIn();
+      }
+    }
+
+    match /mesa_ocupacion/{mesaSlotId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if signedIn()
+        && (
+          isAdmin()
+          || (
+            resource.data.userId == request.auth.uid
+            && resource.data.reservaId == request.resource.data.reservaId
+          )
+        );
+      allow delete: if signedIn()
+        && (isAdmin() || resource.data.userId == request.auth.uid);
+    }
+  }
+}

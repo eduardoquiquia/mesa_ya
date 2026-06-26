@@ -2,6 +2,8 @@ package com.mesaya.ui.screens.menu
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mesaya.domain.model.Meal
+import com.mesaya.domain.model.MetodoPago
 import com.mesaya.ui.theme.Accent
 import com.mesaya.utils.UiState
 import com.mesaya.viewmodel.MenuViewModel
@@ -39,6 +42,10 @@ fun MenuScreen(
     val categories by viewModel.categories.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
     var selectedMeal by remember { mutableStateOf<Meal?>(null) }
+    var showPagoDialog by remember { mutableStateOf(false) }
+    var metodoPago by remember { mutableStateOf(MetodoPago.YAPE) }
+    val pedidoTotal = remember(pedidoItems) { pedidoItems.sumOf { it.subtotal } }
+    val pedidoCantidad = remember(pedidoItems) { pedidoItems.sumOf { it.cantidad } }
 
     LaunchedEffect(reservaId) {
         viewModel.initialize(reservaId)
@@ -52,6 +59,20 @@ fun MenuScreen(
                 selectedMeal = null
             },
             onDismiss = { selectedMeal = null }
+        )
+    }
+
+    if (showPagoDialog) {
+        PagoOnlineDialog(
+            total = pedidoTotal,
+            selected = metodoPago,
+            onSelected = { metodoPago = it },
+            onConfirm = {
+                viewModel.confirmarPago(metodoPago)
+                showPagoDialog = false
+                onNavigateBack()
+            },
+            onDismiss = { showPagoDialog = false }
         )
     }
 
@@ -80,19 +101,17 @@ fun MenuScreen(
                         IconButton(onClick = { showSearch = true }) {
                             Icon(Icons.Default.Search, null)
                         }
-                        if (pedidoItems.isNotEmpty()) {
-                            BadgedBox(
-                                modifier = Modifier.padding(end = 16.dp),
-                                badge = { 
-                                    Badge(containerColor = MaterialTheme.colorScheme.primary) { 
-                                        Text("${pedidoItems.size}", color = Color.White) 
-                                    } 
-                                }
-                            ) {
-                                Icon(Icons.Default.ShoppingCart, null)
-                            }
-                        }
+                        PedidoTopBadge(cantidad = pedidoCantidad)
                     }
+                )
+            }
+        },
+        bottomBar = {
+            AnimatedVisibility(visible = pedidoItems.isNotEmpty()) {
+                PedidoBottomBar(
+                    cantidad = pedidoCantidad,
+                    total = pedidoTotal,
+                    onConfirm = { showPagoDialog = true }
                 )
             }
         }
@@ -137,6 +156,185 @@ fun MenuScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PedidoTopBadge(cantidad: Int) {
+    BadgedBox(
+        modifier = Modifier.padding(end = 16.dp),
+        badge = {
+            if (cantidad > 0) {
+                Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                    Text("$cantidad", color = Color.White)
+                }
+            }
+        }
+    ) {
+        Icon(
+            Icons.Default.ShoppingCart,
+            contentDescription = "Pedido",
+            tint = if (cantidad > 0) MaterialTheme.colorScheme.primary else Color.Gray
+        )
+    }
+}
+
+@Composable
+private fun PedidoBottomBar(
+    cantidad: Int,
+    total: Double,
+    onConfirm: () -> Unit
+) {
+    Surface(
+        shadowElevation = 10.dp,
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                BadgedBox(
+                    badge = {
+                        Badge(containerColor = Accent) {
+                            Text("$cantidad")
+                        }
+                    }
+                ) {
+                    Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Pedido actual", fontWeight = FontWeight.Black)
+                Text("S/ ${"%.2f".format(total)}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+            Button(
+                onClick = onConfirm,
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Pagar", fontWeight = FontWeight.Black)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PagoOnlineDialog(
+    total: Double,
+    selected: MetodoPago,
+    onSelected: (MetodoPago) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Confirmar pago", fontWeight = FontWeight.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Volver al pedido", fontWeight = FontWeight.Bold)
+            }
+        },
+        title = { Text("Pago online", fontWeight = FontWeight.Black) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    MetodoPago.onlineMethods.forEach { metodo ->
+                        PagoMethodChip(
+                            metodo = metodo,
+                            selected = metodo == selected,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onSelected(metodo) }
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(116.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(Color.White)
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f), RoundedCornerShape(18.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (selected == MetodoPago.YAPE) Icons.Default.Phone else Icons.Default.Send,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(46.dp)
+                            )
+                        }
+                        Text(selected.label, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                        Text("MesaYa Demo 999 000 111", style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
+                        Text("S/ ${"%.2f".format(total)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+        },
+        shape = RoundedCornerShape(28.dp)
+    )
+}
+
+@Composable
+private fun PagoMethodChip(
+    metodo: MetodoPago,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = modifier
+            .height(64.dp)
+            .clip(shape)
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.White)
+            .border(
+                1.dp,
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                shape
+            )
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            if (metodo == MetodoPago.YAPE) Icons.Default.Phone else Icons.Default.Send,
+            contentDescription = null,
+            tint = if (selected) Color.White else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            metodo.label,
+            fontWeight = FontWeight.Black,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

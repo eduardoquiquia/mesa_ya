@@ -9,8 +9,17 @@ interface ReservaDao {
     @Query("SELECT * FROM reservas ORDER BY fecha DESC")
     fun getAllReservas(): Flow<List<ReservaEntity>>
 
+    @Query("SELECT * FROM reservas WHERE userId = :userId ORDER BY fecha DESC")
+    fun getReservasByUser(userId: String): Flow<List<ReservaEntity>>
+
     @Query("SELECT * FROM reservas WHERE estado = :estado ORDER BY fecha DESC")
     fun getReservasByEstado(estado: String): Flow<List<ReservaEntity>>
+
+    @Query("SELECT * FROM reservas WHERE userId = :userId AND estado = :estado ORDER BY fecha DESC")
+    fun getReservasByUserAndEstado(userId: String, estado: String): Flow<List<ReservaEntity>>
+
+    @Query("SELECT * FROM reservas WHERE fecha BETWEEN :fechaInicio AND :fechaFin AND hora = :hora ORDER BY mesaId")
+    fun getReservasByFechaHora(fechaInicio: Long, fechaFin: Long, hora: String): Flow<List<ReservaEntity>>
 
     @Query("SELECT * FROM reservas WHERE id = :id")
     suspend fun getReservaById(id: Int): ReservaEntity?

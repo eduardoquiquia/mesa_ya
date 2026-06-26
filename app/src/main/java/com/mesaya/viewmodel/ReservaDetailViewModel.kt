@@ -53,22 +53,6 @@ class ReservaDetailViewModel(
         }
     }
 
-    fun marcarAvisoLlegada(reservaId: Int) {
-        viewModelScope.launch {
-            try {
-                val reserva = repository.getReservaById(reservaId) ?: return@launch
-                repository.updateReserva(
-                    reserva.copy(
-                        avisoLlegada = true,
-                        estado = EstadoReserva.EN_PREPARACION.value
-                    )
-                )
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Error al actualizar estado")
-            }
-        }
-    }
-
     fun cambiarEstado(reservaId: Int, nuevoEstado: EstadoReserva) {
         viewModelScope.launch {
             try {

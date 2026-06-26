@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mesaya.domain.model.DetallePedido
 import com.mesaya.domain.model.Meal
+import com.mesaya.domain.model.MetodoPago
 import com.mesaya.domain.repository.MenuRepository
 import com.mesaya.domain.repository.ReservaRepository
 import com.mesaya.utils.UiState
@@ -123,6 +124,23 @@ class MenuViewModel(
                 }
             } catch (e: Exception) {
                 // Error silencioso; el UI puede mostrar snackbar si lo necesita
+            }
+        }
+    }
+
+    fun confirmarPago(metodoPago: MetodoPago) {
+        viewModelScope.launch {
+            try {
+                val reserva = reservaRepository.getReservaById(reservaId) ?: return@launch
+                val total = _pedidoItems.value.sumOf { it.subtotal }
+                reservaRepository.updateReserva(
+                    reserva.copy(
+                        total = total,
+                        metodoPago = metodoPago.value
+                    )
+                )
+            } catch (_: Exception) {
+                // El detalle queda guardado; si falla el pago, el usuario puede intentarlo de nuevo.
             }
         }
     }

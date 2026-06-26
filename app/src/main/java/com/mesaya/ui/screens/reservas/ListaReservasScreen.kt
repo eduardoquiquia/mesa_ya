@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mesaya.domain.model.EstadoReserva
 import com.mesaya.domain.model.Reserva
+import com.mesaya.ui.components.MesaYaLogo
 import com.mesaya.ui.theme.*
 import com.mesaya.utils.UiState
 import com.mesaya.viewmodel.ReservasViewModel
@@ -41,6 +42,7 @@ fun ListaReservasScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedEstado by viewModel.selectedEstado.collectAsState()
+    val reservas = (uiState as? UiState.Success)?.data.orEmpty()
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(
@@ -59,12 +61,16 @@ fun ListaReservasScreen(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
-                        Text(
-                            "MesaYa",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MesaYaLogo(size = 34.dp, backgroundColor = Color.White.copy(alpha = 0.96f))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "MesaYa",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                        }
                     },
                     actions = {
                         IconButton(
@@ -104,12 +110,18 @@ fun ListaReservasScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    StatBox("Hoy", "12", Icons.Default.DateRange, Modifier.weight(1f))
-                    StatBox("Mesas", "24", Icons.Default.Place, Modifier.weight(1f))
-                    StatBox("Meta", "90%", Icons.Default.Star, Modifier.weight(1f))
+                    StatBox("Reservas", reservas.size.toString(), Icons.Default.DateRange, Modifier.weight(1f))
+                    StatBox("Mesas", reservas.map { it.mesaId }.distinct().size.toString(), Icons.Default.Place, Modifier.weight(1f))
+                    StatBox("Pedidos", reservas.count { it.total > 0 }.toString(), Icons.Default.Star, Modifier.weight(1f))
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                NextVisitCard(
+                    reservas = reservas,
+                    onNewReserva = { onNavigateToForm(null) },
+                    onOpenReserva = { onNavigateToDetail(it.id) }
+                )
 
                 EstadoFilterChipsPremium(
                     selectedEstado = selectedEstado,
@@ -170,6 +182,75 @@ fun StatBox(label: String, value: String, icon: ImageVector, modifier: Modifier 
                 Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
             }
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun NextVisitCard(
+    reservas: List<Reserva>,
+    onNewReserva: () -> Unit,
+    onOpenReserva: (Reserva) -> Unit
+) {
+    val nextReserva = remember(reservas) {
+        val now = System.currentTimeMillis()
+        reservas
+            .filter { it.fecha.time >= now && EstadoReserva.fromValue(it.estado) != EstadoReserva.COMPLETADA }
+            .minByOrNull { it.fecha.time }
+            ?: reservas.firstOrNull()
+    }
+    val dateFormat = remember { SimpleDateFormat("dd MMM", Locale("es", "ES")) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        color = Color.White,
+        shape = RoundedCornerShape(22.dp),
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    if (nextReserva == null) "Tu mesa te espera" else "Proxima visita",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    if (nextReserva == null) {
+                        "Crea una reserva y arma tu pedido."
+                    } else {
+                        "${dateFormat.format(nextReserva.fecha)} • ${nextReserva.hora.ifBlank { "--:--" }} • Mesa ${nextReserva.mesaId}"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
+                    color = OnSurface
+                )
+            }
+
+            Button(
+                onClick = {
+                    if (nextReserva == null) onNewReserva() else onOpenReserva(nextReserva)
+                },
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text(if (nextReserva == null) "Reservar" else "Ver", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -333,10 +414,10 @@ fun EmptyStatePremium() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(Icons.Default.Info, null, modifier = Modifier.size(80.dp), tint = Color.LightGray)
+        MesaYaLogo(size = 88.dp, backgroundColor = Color.White, markColor = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
         Text("No hay reservas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-        Text("Las nuevas reservas aparecerán aquí", color = Color.Gray, textAlign = TextAlign.Center)
+        Text("Crea tu primera reserva y prepara el pedido antes de llegar.", color = Color.Gray, textAlign = TextAlign.Center)
     }
 }
 
@@ -349,9 +430,6 @@ fun ErrorStatePremium(msg: String) {
 
 fun estadoColor(estado: EstadoReserva): Color = when (estado) {
     EstadoReserva.PENDIENTE -> StatusPendiente
-    EstadoReserva.CONFIRMADA -> StatusConfirmada
     EstadoReserva.EN_PREPARACION -> StatusPreparacion
-    EstadoReserva.LISTA_SERVIR -> Color(0xFF7209B7)
-    EstadoReserva.ATENDIDA -> StatusAtendida
-    EstadoReserva.CANCELADA -> StatusCancelada
+    EstadoReserva.COMPLETADA -> StatusAtendida
 }

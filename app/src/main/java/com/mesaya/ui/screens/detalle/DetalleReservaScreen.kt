@@ -20,10 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mesaya.domain.model.DetallePedido
-import com.mesaya.domain.model.EstadoReserva
+import com.mesaya.domain.model.MetodoPago
 import com.mesaya.domain.model.Reserva
 import com.mesaya.ui.screens.reservas.StatusBadge
-import com.mesaya.ui.screens.reservas.estadoColor
 import com.mesaya.ui.theme.OnSurface
 import com.mesaya.utils.UiState
 import com.mesaya.viewmodel.ReservaDetailViewModel
@@ -41,7 +40,6 @@ fun DetalleReservaScreen(
     val uiState by viewModel.uiState.collectAsState()
     val detalles by viewModel.detalles.collectAsState()
     val total by viewModel.total.collectAsState()
-    var showEstadoMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(reservaId) {
         viewModel.loadReserva(reservaId)
@@ -102,38 +100,6 @@ fun DetalleReservaScreen(
                     }
 
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(
-                                onClick = { showEstadoMenu = true },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), contentColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Text("Cambiar Estado", fontWeight = FontWeight.Bold)
-                            }
-                            
-                            DropdownMenu(expanded = showEstadoMenu, onDismissRequest = { showEstadoMenu = false }) {
-                                EstadoReserva.entries.forEach { est ->
-                                    DropdownMenuItem(
-                                        text = { Text(est.label, color = estadoColor(est)) },
-                                        onClick = { viewModel.cambiarEstado(reservaId, est); showEstadoMenu = false }
-                                    )
-                                }
-                            }
-
-                            if (!reserva.avisoLlegada) {
-                                Button(
-                                    onClick = { viewModel.marcarAvisoLlegada(reservaId) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(16.dp)
-                                ) {
-                                    Text("Ya llego", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    item {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("ORDEN DE COMIDA", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
                             TextButton(onClick = { onNavigateToMenu(reservaId) }) {
@@ -162,19 +128,59 @@ fun DetalleReservaScreen(
                                 shape = RoundedCornerShape(24.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("TOTAL A PAGAR", color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
-                                    Text("S/ ${"%.2f".format(total)}", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                                Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("TOTAL A PAGAR", color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
+                                        Text("S/ ${"%.2f".format(total)}", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                                    }
+                                    PagoResumen(MetodoPago.fromValue(reserva.metodoPago))
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PagoResumen(metodo: MetodoPago) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.14f)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    when (metodo) {
+                        MetodoPago.PENDIENTE -> Icons.Default.Info
+                        MetodoPago.YAPE -> Icons.Default.Phone
+                        MetodoPago.PLIN -> Icons.Default.Send
+                    },
+                    contentDescription = null,
+                    tint = Color.White
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (metodo == MetodoPago.PENDIENTE) "Pago pendiente" else "Pagado con ${metodo.label}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black
+                )
+            }
+            Text(
+                if (metodo == MetodoPago.PENDIENTE) "Desde pedido" else "Confirmado",
+                color = Color.White.copy(alpha = 0.8f),
+                style = MaterialTheme.typography.labelMedium
+            )
         }
     }
 }

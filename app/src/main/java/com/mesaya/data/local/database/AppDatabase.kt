@@ -14,7 +14,7 @@ import com.mesaya.data.local.entities.ReservaEntity
 
 @Database(
     entities = [ReservaEntity::class, PlatoEntity::class, DetallePedidoEntity::class],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

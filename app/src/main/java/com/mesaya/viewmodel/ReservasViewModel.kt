@@ -3,6 +3,7 @@ package com.mesaya.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mesaya.domain.model.EstadoReserva
 import com.mesaya.domain.model.Reserva
 import com.mesaya.domain.repository.ReservaRepository
 import com.mesaya.utils.UiState
@@ -44,10 +45,20 @@ class ReservasViewModel(
     fun deleteReserva(reserva: Reserva) {
         viewModelScope.launch {
             try {
-                repository.deleteReserva(reserva)
                 repository.deleteDetallesByReserva(reserva.id)
+                repository.deleteReserva(reserva)
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Error al eliminar")
+            }
+        }
+    }
+
+    fun cambiarEstado(reserva: Reserva, nuevoEstado: EstadoReserva) {
+        viewModelScope.launch {
+            try {
+                repository.updateReserva(reserva.copy(estado = nuevoEstado.value))
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Error al cambiar estado")
             }
         }
     }

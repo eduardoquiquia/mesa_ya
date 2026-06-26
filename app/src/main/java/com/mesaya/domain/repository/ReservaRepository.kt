@@ -7,6 +7,13 @@ import kotlinx.coroutines.flow.Flow
 interface ReservaRepository {
     fun getReservas(): Flow<List<Reserva>>
     fun getReservasByEstado(estado: String): Flow<List<Reserva>>
+    fun getMesasOcupadas(
+        slotKey: String,
+        fechaInicio: Long,
+        fechaFin: Long,
+        hora: String,
+        excludeReservaId: Int
+    ): Flow<Set<Int>>
     fun getReservaFlowById(id: Int): Flow<Reserva?>
     suspend fun getReservaById(id: Int): Reserva?
     suspend fun saveReserva(reserva: Reserva): Int

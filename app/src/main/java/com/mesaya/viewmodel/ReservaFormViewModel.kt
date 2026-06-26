@@ -6,9 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.mesaya.domain.model.Reserva
 import com.mesaya.domain.repository.ReservaRepository
 import com.mesaya.utils.UiState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class ReservaFormViewModel(
     private val repository: ReservaRepository
@@ -19,6 +24,11 @@ class ReservaFormViewModel(
 
     private val _saveSuccess = MutableStateFlow(false)
     val saveSuccess: StateFlow<Boolean> = _saveSuccess
+
+    private val _mesasOcupadas = MutableStateFlow<Set<Int>>(emptySet())
+    val mesasOcupadas: StateFlow<Set<Int>> = _mesasOcupadas
+
+    private var disponibilidadJob: Job? = null
 
     fun loadReserva(id: Int) {
         viewModelScope.launch {
@@ -48,6 +58,33 @@ class ReservaFormViewModel(
         }
     }
 
+    fun observarMesasOcupadas(fecha: Date?, hora: String, excludeReservaId: Int) {
+        disponibilidadJob?.cancel()
+        val cleanHora = hora.trim()
+        if (fecha == null || cleanHora.isBlank()) {
+            _mesasOcupadas.value = emptySet()
+            return
+        }
+
+        val calendar = Calendar.getInstance().apply { time = fecha }
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val fechaInicio = calendar.timeInMillis
+        calendar.set(Calendar.HOUR_OF_DAY, 23)
+        calendar.set(Calendar.MINUTE, 59)
+        calendar.set(Calendar.SECOND, 59)
+        calendar.set(Calendar.MILLISECOND, 999)
+        val fechaFin = calendar.timeInMillis
+        val slotKey = "${slotFormat.format(fecha)}_${cleanHora.filter { it.isDigit() }}"
+
+        disponibilidadJob = viewModelScope.launch {
+            repository.getMesasOcupadas(slotKey, fechaInicio, fechaFin, cleanHora, excludeReservaId)
+                .collect { _mesasOcupadas.value = it }
+        }
+    }
+
     fun resetSaveSuccess() {
         _saveSuccess.value = false
     }
@@ -61,3 +98,5 @@ class ReservaFormViewModel(
             }
     }
 }
+
+private val slotFormat = SimpleDateFormat("yyyyMMdd", Locale.US)
